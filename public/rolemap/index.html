@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>《崩坏3》「英桀关系网」</title>
+<link rel="icon" href="favicon.ico">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#0a0a0f;font-family:'Microsoft YaHei','PingFang SC',sans-serif;color:#e8dfd4;-webkit-font-smoothing:antialiased}
+
+:root{--bg:#0a0a0f;--gold:#c9a96e;--gold-light:#e8d5a8;--gold-dim:#8a7245;--text:#a89984;--text-dim:#6b5f52;--border:rgba(201,169,110,0.15);--glow:rgba(212,168,83,0.3)}
+
+/* === Particle Background === */
+#particles{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.particle{position:absolute;border-radius:50%;background:radial-gradient(circle,rgba(200,170,110,0.8),transparent);animation:float linear infinite;pointer-events:none}
+@keyframes float{0%{transform:translateY(0) scale(1);opacity:0}10%{opacity:1}90%{opacity:1}100%{transform:translateY(-100vh) scale(0.3);opacity:0}}
+
+/* === Main Container === */
+#app{position:relative;width:100%;height:100%;z-index:1;overflow:hidden}
+
+/* === Relationship Map View === */
+.map-view{position:absolute;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding-bottom:90px}
+.rel-image{position:relative;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;z-index:1;transition:opacity 0.5s ease,transform 0.5s ease;filter:drop-shadow(0 0 60px rgba(200,170,110,0.15));cursor:grab;touch-action:none}
+.rel-image.switching{opacity:0;transform:scale(0.95)}
+.rel-image:active{cursor:grabbing}
+
+/* === Character Selector (bottom bar) === */
+.char-selector{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);z-index:20;display:flex;gap:8px;padding:12px 20px;background:linear-gradient(135deg,rgba(20,14,35,0.85),rgba(30,22,48,0.8));border:1px solid var(--border);border-radius:40px;backdrop-filter:blur(12px);box-shadow:0 8px 32px rgba(0,0,0,0.4)}
+.char-btn{width:48px;height:48px;border-radius:50%;border:2px solid rgba(200,170,110,0.3);background:rgba(20,14,35,0.6);cursor:pointer;transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);overflow:hidden;position:relative;flex-shrink:0}
+.char-btn img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.char-btn:hover{transform:scale(1.15);border-color:rgba(200,170,110,0.7);box-shadow:0 0 20px var(--glow)}
+.char-btn.active{border-color:var(--gold);box-shadow:0 0 25px var(--glow),0 0 40px rgba(240,216,122,0.2);transform:scale(1.1)}
+.char-btn.active::after{content:'';position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--gold)}
+.char-btn.active::before{content:'';position:absolute;top:-4px;left:-4px;right:-4px;bottom:-4px;border-radius:50%;border:1px solid rgba(200,170,110,0.3);animation:btn-pulse 2s ease-in-out infinite}
+@keyframes btn-pulse{0%,100%{opacity:0.3;transform:scale(1)}50%{opacity:0.7;transform:scale(1.08)}}
+.char-btn .char-tooltip{position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%);white-space:nowrap;font-size:12px;color:var(--gold-light);background:rgba(20,14,35,0.9);padding:4px 12px;border-radius:12px;border:1px solid var(--border);opacity:0;pointer-events:none;transition:all 0.3s ease;text-shadow:0 1px 4px rgba(0,0,0,0.5)}
+.char-btn:hover .char-tooltip{opacity:1;transform:translateX(-50%) translateY(-4px)}
+
+/* === Zoom Controls === */
+.zoom-controls{position:absolute;bottom:90px;right:24px;z-index:20;display:flex;flex-direction:column;gap:8px}
+.zoom-btn{width:40px;height:40px;border-radius:50%;border:1px solid var(--border);background:rgba(20,14,35,0.8);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--gold-light);font-size:18px;transition:all 0.3s ease;backdrop-filter:blur(8px)}
+.zoom-btn:hover{border-color:var(--gold);background:rgba(20,14,35,0.95);box-shadow:0 0 15px var(--glow)}
+.zoom-btn:active{transform:scale(0.95)}
+.zoom-hint{position:absolute;bottom:90px;left:24px;z-index:20;font-size:11px;color:rgba(200,170,110,0.4);letter-spacing:1px;pointer-events:none;transition:opacity 0.3s}
+
+/* === Center Character Info === */
+.center-info{position:absolute;top:24px;right:24px;z-index:15;cursor:pointer;transition:all 0.3s ease}
+.center-info:hover{transform:translateY(-2px)}
+.center-card{padding:16px 24px;background:linear-gradient(145deg,rgba(20,14,35,0.8),rgba(30,22,48,0.75));border:1px solid rgba(200,170,110,0.25);border-radius:14px;backdrop-filter:blur(10px);box-shadow:0 4px 20px rgba(0,0,0,0.4);text-align:center;min-width:140px}
+.center-name{font-size:20px;font-weight:700;color:transparent;background:linear-gradient(135deg,#d4a853,#f5e6a3);background-clip:text;-webkit-background-clip:text;letter-spacing:3px;margin-bottom:4px}
+.center-signet{font-size:12px;color:rgba(200,170,110,0.6);letter-spacing:2px}
+.center-rank{font-size:14px;color:var(--gold);font-weight:600;letter-spacing:1px;margin-top:2px}
+.center-hint{font-size:11px;color:rgba(200,170,110,0.4);margin-top:6px;letter-spacing:1px}
+
+/* ========== Detail Panel ========== */
+.detail-panel{position:fixed;top:0;left:0;width:100%;height:100%;z-index:100;display:flex;opacity:0;visibility:hidden;transition:opacity 0.4s ease}
+.detail-panel.visible{opacity:1;visibility:visible}
+.detail-overlay{position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(8,4,16,0.4);backdrop-filter:blur(60px) saturate(0.4);-webkit-backdrop-filter:blur(60px) saturate(0.4);z-index:0;pointer-events:none}
+
+/* Left: character illustration */
+.detail-left{flex:0 0 55%;position:relative;overflow:hidden;background:transparent;z-index:1}
+.detail-left::before{content:'';position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(8,4,16,0.5);backdrop-filter:blur(60px) saturate(0.4);-webkit-backdrop-filter:blur(60px) saturate(0.4);z-index:0}
+.detail-left img{width:100%;height:100%;object-fit:cover;object-position:center top;position:relative;z-index:2;opacity:0;transform:translateX(-60px);transition:all 0.7s cubic-bezier(0.4,0,0.2,1) 0.35s}
+.detail-panel.visible .detail-left img{opacity:1;transform:translateX(0)}
+.detail-left::after{content:'';position:absolute;top:0;right:0;width:250px;height:100%;background:linear-gradient(90deg,transparent,rgba(10,6,18,0.6) 50%,rgba(10,6,18,0.95));pointer-events:none;z-index:3}
+
+/* Right: info card */
+.detail-right{flex:1;display:flex;align-items:center;justify-content:center;padding:40px 48px 40px 24px;position:relative;z-index:1}
+.detail-card{width:100%;max-width:640px;padding:48px 44px;background:linear-gradient(160deg,rgba(26,18,42,0.88),rgba(16,12,28,0.94));border:1px solid rgba(201,169,110,0.2);border-radius:20px;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:0 8px 60px rgba(0,0,0,0.5),inset 0 1px 0 rgba(201,169,110,0.1);overflow-y:auto;max-height:90vh;position:relative}
+.detail-card::before{content:'';position:absolute;top:0;left:0;width:100%;height:3px;background:linear-gradient(90deg,transparent,var(--gold),transparent);border-radius:20px 20px 0 0;animation:line-glow 3s ease-in-out infinite alternate}
+@keyframes line-glow{0%{opacity:0.5;box-shadow:0 0 8px rgba(201,169,110,0.2)}100%{opacity:1;box-shadow:0 0 16px rgba(201,169,110,0.5)}}
+.detail-card::-webkit-scrollbar{width:4px}
+.detail-card::-webkit-scrollbar-track{background:transparent}
+.detail-card::-webkit-scrollbar-thumb{background:var(--gold-dim);border-radius:2px}
+
+/* Staggered fade-in using data-delay */
+.anim-item{opacity:0;transform:translateY(18px);transition:opacity 0.5s ease,transform 0.5s ease}
+.detail-panel.visible .anim-item{opacity:1;transform:translateY(0)}
+.detail-panel.visible .anim-item[data-delay="1"]{transition-delay:0.45s}
+.detail-panel.visible .anim-item[data-delay="2"]{transition-delay:0.52s}
+.detail-panel.visible .anim-item[data-delay="3"]{transition-delay:0.59s}
+.detail-panel.visible .anim-item[data-delay="4"]{transition-delay:0.66s}
+.detail-panel.visible .anim-item[data-delay="5"]{transition-delay:0.73s}
+.detail-panel.visible .anim-item[data-delay="6"]{transition-delay:0.80s}
+.detail-panel.visible .anim-item[data-delay="7"]{transition-delay:0.87s}
+.detail-panel.visible .anim-item[data-delay="8"]{transition-delay:0.94s}
+
+.detail-close{position:absolute;top:16px;right:16px;width:36px;height:36px;border-radius:50%;border:1px solid var(--border);background:rgba(26,21,32,0.6);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text);font-size:16px;opacity:0;transform:rotate(-90deg) scale(0.8);transition:all 0.4s cubic-bezier(0.4,0,0.2,1) 0.6s;z-index:10}
+.detail-panel.visible .detail-close{opacity:1;transform:rotate(0) scale(1)}
+.detail-close:hover{border-color:var(--gold);color:var(--gold);box-shadow:0 0 15px var(--glow)}
+
+.detail-name{font-size:42px;font-weight:700;background:linear-gradient(135deg,var(--gold-light),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:10px;line-height:1.2}
+
+.detail-cv{display:inline-flex;align-items:center;gap:8px;padding:4px 14px;background:linear-gradient(135deg,rgba(201,169,110,0.12),rgba(201,169,110,0.04));border:1px solid var(--border);border-radius:14px;color:var(--text);font-size:12px;margin-bottom:20px;width:fit-content}
+.detail-cv span{color:var(--gold-light)}
+
+.detail-divider{width:80px;height:2px;background:linear-gradient(90deg,var(--gold),transparent);margin:12px 0 20px}
+
+.detail-meta{display:flex;gap:28px;margin-bottom:20px}
+.detail-meta-item{display:flex;flex-direction:column;gap:3px}
+.detail-meta-label{font-size:11px;color:var(--text-dim);letter-spacing:2px}
+.detail-meta-value{font-size:18px;color:var(--gold-light);font-weight:600}
+
+.detail-section-title{font-size:14px;color:var(--gold);font-weight:600;letter-spacing:2px;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.detail-section-title::before{content:'\273F';font-size:11px}
+
+.detail-desc{font-size:14px;line-height:1.8;color:var(--text);margin-bottom:24px;max-height:220px;overflow-y:auto;padding-right:6px}
+.detail-desc::-webkit-scrollbar{width:3px}
+.detail-desc::-webkit-scrollbar-thumb{background:var(--gold-dim);border-radius:3px}
+.detail-desc::-webkit-scrollbar-track{background:transparent}
+
+.detail-icons{display:flex;gap:12px;flex-wrap:wrap}
+.detail-icon-card{display:flex;flex-direction:column;align-items:center;gap:8px;width:140px;padding:12px;background:linear-gradient(135deg,rgba(201,169,110,0.08),rgba(201,169,110,0.02));border:1px solid var(--border);border-radius:10px;transition:border-color 0.3s,background 0.3s,transform 0.3s,box-shadow 0.3s}
+.detail-icon-card:hover{border-color:rgba(201,169,110,0.5);background:linear-gradient(135deg,rgba(201,169,110,0.15),rgba(201,169,110,0.05));transform:translateY(-4px);box-shadow:0 6px 20px rgba(0,0,0,0.3)}
+.detail-icon-card img{width:90px;height:90px;object-fit:contain;border-radius:6px}
+.detail-icon-card span{font-size:12px;color:var(--text);text-align:center;word-break:break-all}
+
+/* === Responsive === */
+@media(max-width:900px){
+  .detail-panel{flex-direction:column}
+  .detail-left{flex:0 0 40%}
+  .detail-left::after{width:100%;height:80px;top:auto;bottom:0;right:0;background:linear-gradient(0deg,rgba(10,6,18,0.9),transparent)}
+  .detail-right{padding:16px 20px 24px;align-items:stretch}
+  .detail-card{max-width:none;max-height:none;padding:28px 24px;border-radius:16px}
+  .detail-name{font-size:26px}
+  .detail-meta{gap:20px}
+  .char-btn{width:40px;height:40px}
+  .char-selector{gap:6px;padding:10px 16px}
+  .map-view{padding-bottom:78px}
+}
+@media(max-width:600px){
+  .char-btn{width:34px;height:34px}
+  .char-selector{
+    gap:4px;
+    padding:8px 12px;
+    bottom:12px;
+    max-width:calc(100% - 24px);
+    overflow-x:auto;
+    overflow-y:hidden;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+    -ms-overflow-style:none;
+  }
+  .char-selector::-webkit-scrollbar{display:none}
+  .map-view{padding-bottom:66px}
+  .detail-left{flex:0 0 35%}
+  .detail-card{padding:20px 16px}
+  .detail-name{font-size:22px}
+  .detail-desc{max-height:100px}
+  .center-card{padding:12px 16px;min-width:100px}
+  .center-name{font-size:16px}
+  .center-info{top:12px;right:12px}
+  .center-hint{display:none}
+  .detail-close{top:8px;right:8px;width:32px;height:32px;font-size:14px}
+  .detail-icons{gap:8px}
+  .detail-icon-card{width:100px;padding:8px}
+  .detail-icon-card img{width:60px;height:60px}
+  .zoom-controls{bottom:70px;right:12px}
+  .zoom-btn{width:36px;height:36px;font-size:16px}
+  .zoom-hint{display:none}
+}
+@media(max-width:400px){
+  .char-btn{width:30px;height:30px}
+  .char-selector{padding:6px 8px}
+  .center-name{font-size:14px}
+  .center-rank{font-size:12px}
+  .detail-left{flex:0 0 30%}
+  .detail-card{padding:16px 12px}
+  .detail-name{font-size:18px}
+  .detail-meta{flex-direction:column;gap:12px}
+  .detail-desc{max-height:80px;font-size:13px}
+  .detail-icon-card{width:80px}
+  .detail-icon-card img{width:50px;height:50px}
+}
+</style>
+</head>
+<body>
+<div id="particles"></div>
+<div id="app">
+  <div class="map-view" id="mapView">
+    <img class="rel-image" id="relImage" src="" alt="关系网">
+    <div class="center-info" id="centerInfo">
+      <div class="center-card">
+        <div class="center-name" id="centerName"></div>
+        <div class="center-signet" id="centerSignet"></div>
+        <div class="center-rank" id="centerRank"></div>
+        <div class="center-hint">点击查看详情</div>
+      </div>
+    </div>
+    <div class="char-selector" id="charSelector"></div>
+    <div class="zoom-controls">
+      <button class="zoom-btn" id="zoomIn">+</button>
+      <button class="zoom-btn" id="zoomOut">−</button>
+      <button class="zoom-btn" id="zoomReset">⟲</button>
+    </div>
+    <div class="zoom-hint" id="zoomHint">滚轮/双指缩放 · 拖拽移动</div>
+  </div>
+
+  <!-- Detail Panel -->
+  <div class="detail-panel" id="detailPanel">
+    <div class="detail-overlay"></div>
+    <div class="detail-left">
+      <img id="detailCharImg" src="" alt="">
+    </div>
+    <div class="detail-right">
+      <div class="detail-card">
+        <button class="detail-close" id="detailClose">&#10005;</button>
+        <h1 class="detail-name anim-item" data-delay="1" id="detailName"></h1>
+        <div class="detail-cv anim-item" data-delay="2">CV: <span id="detailCv"></span></div>
+        <div class="detail-divider anim-item" data-delay="3"></div>
+        <div class="detail-meta anim-item" data-delay="4">
+          <div class="detail-meta-item">
+            <div class="detail-meta-label">位次</div>
+            <div class="detail-meta-value" id="detailPosition"></div>
+          </div>
+          <div class="detail-meta-item">
+            <div class="detail-meta-label">刻印</div>
+            <div class="detail-meta-value" id="detailKeyin"></div>
+          </div>
+        </div>
+        <div class="detail-section-title anim-item" data-delay="5">来自爱莉希雅的评价</div>
+        <div class="detail-desc anim-item" data-delay="6" id="detailDesc"></div>
+        <div class="detail-section-title anim-item" data-delay="7">印记</div>
+        <div class="detail-icons anim-item" data-delay="8" id="detailIcons"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var activeChar = 2;
+  var data = {};
+
+  // Load data.json (works with both file:// and http://)
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', 'data.json', false);
+  xhr.send();
+  if(xhr.status === 200 || xhr.status === 0){
+    data = JSON.parse(xhr.responseText);
+  }
+
+  init();
+
+  var scale = 1;
+  var posX = 0;
+  var posY = 0;
+  var isDragging = false;
+  var startX, startY;
+
+  function init(){
+    initParticles();
+    buildSelector();
+    initZoom();
+    switchCharacter(activeChar, false);
+  }
+
+  function initParticles(){
+    var c = document.getElementById('particles');
+    for(var i = 0; i < 40; i++){
+      var p = document.createElement('div');
+      p.className = 'particle';
+      var size = Math.random() * 3 + 1;
+      p.style.cssText = 'width:'+size+'px;height:'+size+'px;left:'+Math.random()*100+'%;top:'+(Math.random()*100+100)+'%;animation-duration:'+(Math.random()*8+6)+'s;animation-delay:'+(Math.random()*10)+'s;opacity:'+(Math.random()*0.5+0.2);
+      c.appendChild(p);
+    }
+  }
+
+  function buildSelector(){
+    var sel = document.getElementById('charSelector');
+    for(var i = 1; i <= 13; i++){
+      (function(id){
+        var num = String(id).padStart(2,'0');
+        var btn = document.createElement('div');
+        btn.className = 'char-btn' + (id === activeChar ? ' active' : '');
+        btn.dataset.id = id;
+        btn.innerHTML = '<img src="'+data['avatar_'+num+'_s']+'" alt="'+data['person_'+num+'_name']+'"><div class="char-tooltip">'+data['person_'+num+'_name']+'</div>';
+        btn.addEventListener('click', function(){
+          if(id === activeChar) return;
+          switchCharacter(id, true);
+        });
+        sel.appendChild(btn);
+      })(i);
+    }
+  }
+
+  function initZoom(){
+    var relImg = document.getElementById('relImage');
+    var hint = document.getElementById('zoomHint');
+
+    function applyTransform(){
+      relImg.style.transform = 'translate('+posX+'px,'+posY+'px) scale('+scale+')';
+      hint.style.opacity = scale === 1 && posX === 0 && posY === 0 ? '1' : '0';
+    }
+
+    // Mouse wheel zoom
+    document.getElementById('mapView').addEventListener('wheel', function(e){
+      e.preventDefault();
+      var delta = e.deltaY > 0 ? -0.1 : 0.1;
+      scale = Math.min(Math.max(scale + delta, 0.5), 3);
+      applyTransform();
+    }, {passive: false});
+
+    // Pinch zoom
+    var initialDistance = 0;
+    var initialScale = 1;
+    relImg.addEventListener('touchstart', function(e){
+      if(e.touches.length === 2){
+        initialDistance = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        initialScale = scale;
+      }
+    }, {passive: true});
+
+    relImg.addEventListener('touchmove', function(e){
+      if(e.touches.length === 2){
+        var currentDistance = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        scale = Math.min(Math.max(initialScale * (currentDistance / initialDistance), 0.5), 3);
+        applyTransform();
+      }
+    }, {passive: true});
+
+    // Drag - disable transition during drag
+    relImg.addEventListener('mousedown', function(e){
+      if(scale > 1){
+        isDragging = true;
+        startX = e.clientX - posX;
+        startY = e.clientY - posY;
+        relImg.style.cursor = 'grabbing';
+        relImg.style.transition = 'none';
+      }
+    });
+
+    document.addEventListener('mousemove', function(e){
+      if(isDragging){
+        posX = e.clientX - startX;
+        posY = e.clientY - startY;
+        applyTransform();
+      }
+    });
+
+    document.addEventListener('mouseup', function(){
+      if(isDragging){
+        isDragging = false;
+        relImg.style.cursor = scale > 1 ? 'grab' : 'default';
+        relImg.style.transition = '';
+      }
+    });
+
+    // Touch drag (single finger when zoomed)
+    relImg.addEventListener('touchstart', function(e){
+      if(e.touches.length === 1 && scale > 1){
+        isDragging = true;
+        startX = e.touches[0].clientX - posX;
+        startY = e.touches[0].clientY - posY;
+        relImg.style.transition = 'none';
+      }
+    }, {passive: true});
+
+    relImg.addEventListener('touchmove', function(e){
+      if(isDragging && e.touches.length === 1){
+        posX = e.touches[0].clientX - startX;
+        posY = e.touches[0].clientY - startY;
+        applyTransform();
+      }
+    }, {passive: true});
+
+    relImg.addEventListener('touchend', function(){
+      if(isDragging){
+        isDragging = false;
+        relImg.style.transition = '';
+      }
+    }, {passive: true});
+
+    // Buttons
+    document.getElementById('zoomIn').addEventListener('click', function(){
+      scale = Math.min(scale + 0.2, 3);
+      applyTransform();
+    });
+
+    document.getElementById('zoomOut').addEventListener('click', function(){
+      scale = Math.max(scale - 0.2, 0.5);
+      if(scale <= 1){ posX = 0; posY = 0; }
+      applyTransform();
+    });
+
+    document.getElementById('zoomReset').addEventListener('click', function(){
+      scale = 1;
+      posX = 0;
+      posY = 0;
+      applyTransform();
+    });
+  }
+
+  function switchCharacter(id, animate){
+    activeChar = id;
+    var num = String(id).padStart(2,'0');
+    var relImg = document.getElementById('relImage');
+
+    // Reset zoom
+    scale = 1;
+    posX = 0;
+    posY = 0;
+    relImg.style.transform = '';
+
+    document.querySelectorAll('.char-btn').forEach(function(b){
+      b.classList.toggle('active', parseInt(b.dataset.id) === id);
+    });
+
+    document.getElementById('centerName').textContent = data['person_'+num+'_name'];
+    document.getElementById('centerSignet').textContent = data['person_'+num+'_keyin_content'];
+    document.getElementById('centerRank').textContent = '位次 ' + data['person_'+num+'_position_content'];
+
+    if(animate){
+      relImg.classList.add('switching');
+      setTimeout(function(){
+        relImg.src = data['relationship'+id];
+        relImg.classList.remove('switching');
+      }, 300);
+    } else {
+      relImg.src = data['relationship'+id];
+    }
+  }
+
+  function showDetail(id){
+    var num = String(id).padStart(2,'0');
+    var p = function(k){ return data['person_'+num+'_'+k] || ''; };
+
+    document.getElementById('detailCharImg').src = data['img_character_'+num];
+    document.getElementById('detailName').textContent = p('name');
+    document.getElementById('detailCv').textContent = p('cv');
+    document.getElementById('detailPosition').textContent = p('position_content');
+    document.getElementById('detailKeyin').textContent = p('keyin_content');
+    document.getElementById('detailDesc').innerHTML = p('hobby_desc').replace(/\n/g, '<br>');
+
+    // Build icon cards
+    var iconsHtml = '';
+    for(var i = 1; i <= 3; i++){
+      var v = p('icon0'+i);
+      var imgSrc = data['img_'+num+'_item0'+i] || '';
+      if(v){
+        iconsHtml += '<div class="detail-icon-card">';
+        if(imgSrc) iconsHtml += '<img src="'+imgSrc+'" alt="">';
+        iconsHtml += '<span>'+v+'</span></div>';
+      }
+    }
+    document.getElementById('detailIcons').innerHTML = iconsHtml;
+
+    var panel = document.getElementById('detailPanel');
+    // Re-trigger animations
+    panel.classList.remove('visible');
+    void panel.offsetHeight;
+    panel.classList.add('visible');
+  }
+
+  // Events
+  document.getElementById('centerInfo').addEventListener('click', function(){
+    showDetail(activeChar);
+  });
+
+  document.getElementById('detailClose').addEventListener('click', function(){
+    document.getElementById('detailPanel').classList.remove('visible');
+  });
+
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape'){
+      document.getElementById('detailPanel').classList.remove('visible');
+    }
+  });
+
+  // Mobile touch optimization
+  var detailPanel = document.getElementById('detailPanel');
+  detailPanel.addEventListener('touchmove', function(e){
+    e.stopPropagation();
+  }, {passive: true});
+
+  // Swipe down to close detail panel
+  var touchStartY = 0;
+  detailPanel.addEventListener('touchstart', function(e){
+    touchStartY = e.touches[0].clientY;
+  }, {passive: true});
+  detailPanel.addEventListener('touchend', function(e){
+    var touchEndY = e.changedTouches[0].clientY;
+    if(touchEndY - touchStartY > 80){
+      detailPanel.classList.remove('visible');
+    }
+  }, {passive: true});
+})();
+</script>
+</body>
+</html>
