@@ -10,10 +10,10 @@ if (import.meta.env.PROD) {
   umamiScript.dataset.websiteId = '7112bf4d-0d2f-4a9c-8bba-f9522e8faf57';
   document.head.appendChild(umamiScript);
 
-  (function(c,l,a,r,i,t,y){
+  (function(c: any, l: Document, a: string, r: string, i: string){
     c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-    t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-    y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+    const t=l.createElement(r) as HTMLScriptElement;t.async=true;t.src="https://www.clarity.ms/tag/"+i;
+    const y=l.getElementsByTagName(r)[0];y!.parentNode!.insertBefore(t,y);
   })(window, document, "clarity", "script", "wtvlyscw2e");
 }
 
