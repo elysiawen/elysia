@@ -177,14 +177,33 @@ function useElapsed() {
   return m > 0 ? `${m}分${String(s).padStart(2, '0')}秒` : `${s}秒`
 }
 
+function useDaysSinceFirstVisit() {
+  const [days, setDays] = useState(1)
+  useEffect(() => {
+    const key = 'elysia-first-visit'
+    const stored = localStorage.getItem(key)
+    if (stored) {
+      const first = new Date(stored)
+      const now = new Date()
+      const diff = Math.floor((now.getTime() - first.getTime()) / 86400000)
+      setDays(diff + 1)
+    } else {
+      localStorage.setItem(key, new Date().toISOString())
+    }
+  }, [])
+  return days
+}
+
 function App() {
   const shellRef = useRef<HTMLDivElement>(null)
   const petalCanvasRef = useRef<HTMLCanvasElement>(null)
+  const trailCanvasRef = useRef<HTMLCanvasElement>(null)
   const whisperRef = useRef<HTMLDivElement>(null)
   const mainRef = useRef<HTMLParagraphElement>(null)
   const [entered, setEntered] = useState(false)
   const [scrollProgress, setScrollProgress] = useState(0)
   const elapsed = useElapsed()
+  const daysSinceVisit = useDaysSinceFirstVisit()
 
   const timeSlot = getTimeSlot(new Date().getHours())
 
@@ -243,6 +262,9 @@ function App() {
     const container = whisperRef.current
     const main = mainRef.current
     if (!container || !main) return
+
+    const timeoutIds = new Set<ReturnType<typeof setTimeout>>()
+    const cleanups = new Set<() => void>()
 
     const spawn = () => {
       if (container.childElementCount >= 9) return
@@ -312,14 +334,24 @@ function App() {
       const cleanup = () => {
         el.removeEventListener('animationend', cleanup)
         el.remove()
+        cleanups.delete(cleanup)
       }
+      cleanups.add(cleanup)
       el.addEventListener('animationend', cleanup)
-      setTimeout(cleanup, (dur + delay) * 1000 + 1000)
+      const tid = setTimeout(() => {
+        cleanup()
+        timeoutIds.delete(tid)
+      }, (dur + delay) * 1000 + 1000)
+      timeoutIds.add(tid)
       container.appendChild(el)
     }
 
     const t = setInterval(spawn, 3000)
-    return () => clearInterval(t)
+    return () => {
+      clearInterval(t)
+      timeoutIds.forEach(id => clearTimeout(id))
+      cleanups.forEach(fn => fn())
+    }
   }, [])
 
   useEffect(() => {
@@ -356,7 +388,7 @@ function App() {
       (entries) => entries.forEach((e) => {
         e.target.classList.toggle('visible', e.isIntersecting)
       }),
-      { threshold: 0.12 },
+      { threshold: 0.12, rootMargin: '0px 0px -50px 0px' },
     )
     els.forEach((el) => obs.observe(el))
     return () => obs.disconnect()
@@ -411,6 +443,7 @@ function App() {
 
     let frame = 0
     let raf = 0
+    let running = true
     const draw = () => {
       ctx.clearRect(0, 0, w, h)
       frame++
@@ -444,9 +477,123 @@ function App() {
 
       raf = requestAnimationFrame(draw)
     }
+
+    // pause animation when tab is not visible
+    const onVisibility = () => {
+      if (document.hidden) {
+        running = false
+        cancelAnimationFrame(raf)
+      } else if (!running) {
+        running = true
+        raf = requestAnimationFrame(draw)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+
     draw()
 
-    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize) }
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('resize', resize)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [])
+
+  // mouse trail particles
+  useEffect(() => {
+    const canvas = trailCanvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const dpr = window.devicePixelRatio || 1
+    let w = 0, h = 0
+    const resize = () => {
+      w = window.innerWidth
+      h = window.innerHeight
+      canvas.width = w * dpr
+      canvas.height = h * dpr
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    }
+    resize()
+    window.addEventListener('resize', resize)
+
+    interface Particle {
+      x: number; y: number
+      vx: number; vy: number
+      life: number; maxLife: number
+      size: number
+      hue: number
+    }
+
+    const particles: Particle[] = []
+    let lastX = 0, lastY = 0
+    let lastTime = 0
+    let raf = 0
+
+    const spawnAt = (x: number, y: number, vx: number, vy: number) => {
+      const speed = Math.sqrt(vx * vx + vy * vy)
+      const count = Math.min(Math.floor(speed / 6), 4) + 1
+      for (let i = 0; i < count; i++) {
+        const angle = Math.atan2(vy, vx) + (Math.random() - 0.5) * 1.2
+        const v = 0.3 + Math.random() * 0.8
+        particles.push({
+          x: x + (Math.random() - 0.5) * 8,
+          y: y + (Math.random() - 0.5) * 8,
+          vx: Math.cos(angle) * v,
+          vy: Math.sin(angle) * v,
+          life: 1,
+          maxLife: 0.5 + Math.random() * 0.5,
+          size: 2 + Math.random() * 3,
+          hue: 330 + Math.random() * 30,
+        })
+      }
+    }
+
+    const onMove = (e: PointerEvent) => {
+      const now = performance.now()
+      const dt = (now - lastTime) / 1000
+      if (dt > 0 && lastTime > 0) {
+        const vx = (e.clientX - lastX) / dt
+        const vy = (e.clientY - lastY) / dt
+        const speed = Math.sqrt(vx * vx + vy * vy)
+        if (speed > 80) spawnAt(e.clientX, e.clientY, vx, vy)
+      }
+      lastX = e.clientX
+      lastY = e.clientY
+      lastTime = now
+    }
+    window.addEventListener('pointermove', onMove, { passive: true })
+
+    let prev = 0
+    const draw = (now: number) => {
+      raf = requestAnimationFrame(draw)
+      const dt = prev ? (now - prev) / 1000 : 0.016
+      prev = now
+
+      ctx.clearRect(0, 0, w, h)
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i]
+        p.life -= dt / p.maxLife
+        if (p.life <= 0) { particles.splice(i, 1); continue }
+        p.x += p.vx
+        p.y += p.vy
+        p.vy += 0.02 // gentle gravity
+        const alpha = p.life * 0.7
+        const s = p.size * p.life
+        ctx.beginPath()
+        ctx.arc(p.x, p.y, s, 0, Math.PI * 2)
+        ctx.fillStyle = `hsla(${p.hue}, 80%, 82%, ${alpha})`
+        ctx.fill()
+      }
+    }
+    raf = requestAnimationFrame(draw)
+
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('resize', resize)
+    }
   }, [])
 
   return (
@@ -458,10 +605,14 @@ function App() {
       <div className="glow-cursor" />
 
       <canvas ref={petalCanvasRef} className="petal-canvas" aria-hidden />
+      <canvas ref={trailCanvasRef} className="trail-canvas" aria-hidden />
 
       <div className="elapsed" aria-hidden>
-        <span className="elapsed-dot" />
-        <span>她已陪伴你 {elapsed}</span>
+        <div className="elapsed-days">我们相遇的第 {daysSinceVisit} 天</div>
+        <div className="elapsed-row">
+          <span className="elapsed-dot" />
+          <span>她已陪伴你 {elapsed}</span>
+        </div>
       </div>
 
       {/* ─── HERO ─── */}

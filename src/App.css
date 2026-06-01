@@ -10,8 +10,6 @@
   color: #fff6fc;
 }
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; }
-
 html { scroll-behavior: smooth; }
 
 body {
@@ -41,16 +39,29 @@ body {
   right: 20px;
   z-index: 50;
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border-radius: 999px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  padding: 10px 16px;
+  border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(10, 6, 18, 0.6);
   backdrop-filter: blur(12px);
   font-size: 12px;
   letter-spacing: 0.06em;
   color: rgba(255, 220, 240, 0.55);
+}
+
+.elapsed-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.elapsed-days {
+  font-size: 11px;
+  color: rgba(255, 200, 230, 0.4);
+  letter-spacing: 0.04em;
 }
 
 .elapsed-dot {
@@ -127,6 +138,16 @@ body {
   position: fixed;
   inset: 0;
   z-index: 2;
+  pointer-events: none;
+  width: 100%;
+  height: 100%;
+}
+
+/* ─── mouse trail ─── */
+.trail-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
   pointer-events: none;
   width: 100%;
   height: 100%;

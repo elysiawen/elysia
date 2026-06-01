@@ -17,6 +17,20 @@ if (import.meta.env.PROD) {
   })(window, document, "clarity", "script", "wtvlyscw2e");
 }
 
+console.log(
+  '%c♡ · · · · · · · · · · · · · · ♡\n' +
+  '  嗨，又见面啦～\n' +
+  '  你居然找到了这里，真厉害呢。\n' +
+  '  看到你我会很开心的～♪\n' +
+  '                    —— 爱莉希雅\n' +
+  '♡ · · · · · · · · · · · · · · ♡',
+  'color: #ffb8e0; font-size: 13px; line-height: 1.8;'
+)
+console.log(
+  '%c💖 有时间的话，多来看看我，好吗？',
+  'color: #d4a0ff; font-size: 12px;'
+)
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />
