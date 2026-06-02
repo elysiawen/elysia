@@ -36,12 +36,13 @@ body {
 .elapsed {
   position: fixed;
   bottom: 20px;
-  right: 20px;
+  left: 20px;
   z-index: 50;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 6px;
+  width: fit-content;
   padding: 10px 16px;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -56,6 +57,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-direction: row-reverse;
 }
 
 .elapsed-days {
@@ -910,9 +912,14 @@ body {
 
   .elapsed {
     bottom: 12px;
-    right: 12px;
+    left: 12px;
     padding: 6px 12px;
     font-size: 11px;
+  }
+
+  .chat-fab {
+    bottom: 12px;
+    right: 12px;
   }
 
   .hero-rank { justify-content: center; }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import ChatWidget from './ChatWidget'
 import engrave from './assets/elysia-engrave.png'
 import heroImg from './assets/elysia-hero.png'
 import './App.css'
@@ -391,6 +392,17 @@ function App() {
       { threshold: 0.12, rootMargin: '0px 0px -50px 0px' },
     )
     els.forEach((el) => obs.observe(el))
+
+    const footer = document.querySelector<HTMLElement>('.footer')
+    if (footer && !footer.classList.contains('visible')) {
+      const footObs = new IntersectionObserver(
+        ([e]) => { if (e.isIntersecting) footer.classList.add('visible') },
+        { threshold: 0.1 },
+      )
+      footObs.observe(footer)
+      return () => { obs.disconnect(); footObs.disconnect() }
+    }
+
     return () => obs.disconnect()
   }, [])
 
@@ -611,7 +623,7 @@ function App() {
         <div className="elapsed-days">我们相遇的第 {daysSinceVisit} 天</div>
         <div className="elapsed-row">
           <span className="elapsed-dot" />
-          <span>她已陪伴你 {elapsed}</span>
+          <span>已相伴 {elapsed}</span>
         </div>
       </div>
 
@@ -787,6 +799,8 @@ function App() {
           </div>
         </div>
       </footer>
+
+      <ChatWidget />
     </div>
   )
 }
