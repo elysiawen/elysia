@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /rolemap/
+
+Sitemap: https://elysia.cc/sitemap.xml

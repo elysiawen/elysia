@@ -649,7 +649,7 @@ function App() {
             <div className="art-glow" />
             <img className="art-engrave-back" src={engrave} alt="" aria-hidden />
             <img className="art-shadow" src={heroImg} alt="" aria-hidden />
-            <img className="art-hero" src={heroImg} alt="爱莉希雅" />
+            <img className="art-hero" src={heroImg} alt="爱莉希雅" fetchPriority="high" />
           </div>
         </div>
 
@@ -736,7 +736,7 @@ function App() {
         <div className="section-label">Relations</div>
         <h2 className="section-title">英桀关系网</h2>
         <div className="relations-frame-wrap">
-          <iframe className="relations-frame" src="/rolemap/index.html" title="英桀关系网" />
+          <iframe className="relations-frame" src="/rolemap/index.html" title="英桀关系网" loading="lazy" />
         </div>
       </section>
 
