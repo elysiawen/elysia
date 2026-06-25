@@ -753,7 +753,7 @@ function App() {
         <div className="theysay-grid">
           {theySay.map((item) => (
             <article key={item.name} className="theysay-card">
-              <span className="theysay-name">{item.name}</span>
+              <h3 className="theysay-name">{item.name}</h3>
               <p className="theysay-quote">{item.quote}</p>
             </article>
           ))}

@@ -2,4 +2,15 @@ User-agent: *
 Allow: /
 Disallow: /rolemap/
 
+User-agent: Googlebot
+Allow: /
+
+User-agent: Baiduspider
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
 Sitemap: https://elysia.cc/sitemap.xml
+
+Host: elysia.cc
