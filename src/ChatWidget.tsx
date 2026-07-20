@@ -16,14 +16,105 @@ interface Msg {
   content: string
 }
 
+interface SessionRecord {
+  id: string
+  token: string
+  preview: string
+  createdAt: number
+}
+
+const HISTORY_KEY = 'elysia-chat-sessions'
+const GREETING = '嗨~ 期待已久的相遇，是不是觉得，今天的我又比昨天更美丽了一点呢？快跟我聊聊吧，关于你的一切，我可都超级好奇哦~✨'
+
+function getHistory(): SessionRecord[] {
+  try {
+    return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]')
+  } catch {
+    return []
+  }
+}
+
+function saveHistory(list: SessionRecord[]) {
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(list))
+}
+
+function addToHistory(record: SessionRecord) {
+  const list = getHistory().filter((r) => r.id !== record.id)
+  list.unshift(record)
+  if (list.length > 10) list.length = 10
+  saveHistory(list)
+}
+
+function removeFromHistory(sessionId: string) {
+  saveHistory(getHistory().filter((r) => r.id !== sessionId))
+}
+
+function formatTime(ts: number): string {
+  const d = new Date(ts)
+  const now = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  const isToday =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  if (isToday) return hm
+  const yesterday = new Date(now)
+  yesterday.setDate(yesterday.getDate() - 1)
+  const isYesterday =
+    d.getFullYear() === yesterday.getFullYear() &&
+    d.getMonth() === yesterday.getMonth() &&
+    d.getDate() === yesterday.getDate()
+  if (isYesterday) return `昨天 ${hm}`
+  return `${d.getMonth() + 1}/${d.getDate()} ${hm}`
+}
+
 let sessionReady: Promise<string> | null = null
 
 function ensureSession() {
   if (!sessionReady) {
     const token = getSessionToken()
-    sessionReady = createSession(token, CHARACTER_ID).then((s) => s.id)
+    sessionReady = createSession(token, CHARACTER_ID).then((s) => {
+      // 创建会话时立刻存入历史，确保 token 不会丢失
+      if (!getHistory().some((r) => r.id === s.id)) {
+        addToHistory({
+          id: s.id,
+          token,
+          preview: '新会话',
+          createdAt: Date.now(),
+        })
+      }
+      return s.id
+    })
   }
   return sessionReady
+}
+
+function resetSession() {
+  sessionReady = null
+  const newToken = crypto.randomUUID()
+  localStorage.setItem('elysia-chat-session', newToken)
+}
+
+function WarnIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="8" x2="12" y2="12" />
+      <line x1="12" y1="16" x2="12.01" y2="16" />
+    </svg>
+  )
+}
+
+function ConfirmOverlay({ onCancel, children }: { onCancel: () => void; children: React.ReactNode }) {
+  return (
+    <div className="chat-confirm-overlay" onClick={onCancel}>
+      <div className="chat-confirm-dialog" onClick={(e) => e.stopPropagation()}>
+        <div className="chat-confirm-icon"><WarnIcon /></div>
+        {children}
+      </div>
+    </div>
+  )
 }
 
 export default function ChatWidget() {
@@ -35,13 +126,21 @@ export default function ChatWidget() {
   const [historyLoaded, setHistoryLoaded] = useState(false)
   const [showGreeting, setShowGreeting] = useState(false)
   const [greetingChars, setGreetingChars] = useState(0)
+  const [showHistory, setShowHistory] = useState(false)
+  const [sessionHistory, setSessionHistory] = useState<SessionRecord[]>([])
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null)
+  const [pendingNewSession, setPendingNewSession] = useState(false)
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const activeSidRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!open) return
     ensureSession().then(async (sid) => {
+      activeSidRef.current = sid
+      setActiveSessionId(sid)
       if (historyLoaded) return
       try {
         const hist = await getMessages(sid)
@@ -53,12 +152,23 @@ export default function ChatWidget() {
               content: m.content,
             })),
           )
+          // 用实际第一条消息更新历史预览
+          const history = getHistory()
+          const record = history.find((r) => r.id === sid)
+          if (record) {
+            const firstUser = hist.find((m) => m.role === 'user')
+            if (firstUser) {
+              record.preview = firstUser.content.length > 30
+                ? firstUser.content.slice(0, 30) + '…'
+                : firstUser.content
+              saveHistory(history)
+            }
+          }
         } else {
-          const greeting = '嗨~ 期待已久的相遇，是不是觉得，今天的我又比昨天更美丽了一点呢？快跟我聊聊吧，关于你的一切，我可都超级好奇哦~✨'
           setMessages([{
             id: crypto.randomUUID(),
             role: 'assistant',
-            content: greeting,
+            content: GREETING,
           }])
         }
       } catch {
@@ -97,7 +207,7 @@ export default function ChatWidget() {
     return () => { clearTimeout(show); clearTimeout(hide) }
   }, [])
 
-  const greetingText = '嗨~ 期待已久的相遇，是不是觉得，今天的我又比昨天更美丽了一点呢？快跟我聊聊吧，关于你的一切，我可都超级好奇哦~✨'
+  const greetingText = GREETING
 
   useEffect(() => {
     if (!showGreeting) return
@@ -127,6 +237,15 @@ export default function ChatWidget() {
 
     try {
       const sessionId = await ensureSession()
+      activeSidRef.current = sessionId
+      setActiveSessionId(sessionId)
+      // 更新历史预览（会话已由 ensureSession 创建时存入）
+      const history = getHistory()
+      const record = history.find((r) => r.id === sessionId)
+      if (record) {
+        record.preview = text.length > 30 ? text.slice(0, 30) + '…' : text
+        saveHistory(history)
+      }
       const assistantId = crypto.randomUUID()
       setMessages((prev) => [
         ...prev,
@@ -191,6 +310,70 @@ export default function ChatWidget() {
     }
   }
 
+  const handleNewSession = useCallback(() => {
+    if (getHistory().length >= 10) {
+      setPendingNewSession(true)
+      return
+    }
+    doNewSession()
+  }, [])
+
+  const doNewSession = useCallback(() => {
+    resetSession()
+    setMessages([])
+    setHistoryLoaded(false)
+    setError('')
+    setShowHistory(false)
+  }, [])
+
+  const handleSelectSession = useCallback((record: SessionRecord) => {
+    // 切换到已存在的会话
+    sessionReady = Promise.resolve(record.id)
+    localStorage.setItem('elysia-chat-session', record.token)
+    activeSidRef.current = record.id
+    setActiveSessionId(record.id)
+
+    setLoading(true)
+    getMessages(record.id)
+      .then((hist) => {
+        if (hist.length) {
+          setMessages(
+            hist.map((m) => ({
+              id: m.id,
+              role: m.role,
+              content: m.content,
+            })),
+          )
+        } else {
+          const greeting = GREETING
+          setMessages([{
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: greeting,
+          }])
+        }
+        setHistoryLoaded(true)
+        setShowHistory(false)
+      })
+      .catch(() => {
+        setError('加载会话失败')
+        setShowHistory(false)
+      })
+      .finally(() => setLoading(false))
+  }, [])
+
+  const handleDeleteSession = useCallback((sessionId: string) => {
+    removeFromHistory(sessionId)
+    setSessionHistory(getHistory())
+    // 如果正在删除的是当前活跃的会话，创建新会话
+    if (activeSidRef.current === sessionId) {
+      resetSession()
+      setMessages([])
+      setHistoryLoaded(false)
+      setError('')
+    }
+  }, [])
+
   return (
     <>
       <div
@@ -222,51 +405,125 @@ export default function ChatWidget() {
               <p>Elysia · 在线</p>
             </div>
           </div>
-          <button
-            className="chat-close-btn"
-            onClick={() => setOpen(false)}
-            aria-label="关闭"
-          >
-            ✕
-          </button>
+          <div className="chat-header-actions">
+            <button
+              className={`chat-history-btn ${showHistory ? 'active' : ''}`}
+              onClick={() => {
+                setShowHistory((v) => {
+                  if (!v) setSessionHistory(getHistory())
+                  return !v
+                })
+              }}
+              aria-label="历史会话"
+              title="历史会话"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+            </button>
+            <button
+              className="chat-new-session-btn"
+              onClick={handleNewSession}
+              aria-label="新建会话"
+              title="新建会话"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </button>
+            <button
+              className="chat-close-btn"
+              onClick={() => setOpen(false)}
+              aria-label="关闭"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         <div className="chat-messages" ref={listRef}>
-          {!historyLoaded && messages.length === 0 && (
-            <div className="chat-msg assistant">
-              <img
-                className="chat-msg-avatar"
-                src="/rolemap/assets/images/avatar-elysia-02.png"
-                alt=""
-              />
-              <div className="chat-msg-bubble">
-                <div className="chat-msg-typing">
-                  <span /><span /><span />
-                </div>
-              </div>
-            </div>
-          )}
-          {messages.map((m) => (
-            <div key={m.id} className={`chat-msg ${m.role}`}>
-              {m.role === 'assistant' && (
-                <img
-                  className="chat-msg-avatar"
-                  src="/rolemap/assets/images/avatar-elysia-02.png"
-                  alt=""
-                />
-              )}
-              <div className="chat-msg-bubble">
-                {m.content || (
-                  <div className="chat-msg-typing">
-                    <span /><span /><span />
-                  </div>
+          {showHistory ? (
+            <div className="chat-history-view">
+              <div className="chat-history-title">历史会话</div>
+              <div className="chat-history-list">
+                {sessionHistory.length === 0 ? (
+                  <div className="chat-history-empty">暂无历史会话</div>
+                ) : (
+                  sessionHistory.map((session) => (
+                    <div
+                      key={session.id}
+                      className="chat-history-item"
+                      onClick={() => handleSelectSession(session)}
+                    >
+                      <div className="chat-history-item-avatar">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+                        </svg>
+                      </div>
+                      <div className="chat-history-item-main">
+                        <span className="chat-history-item-preview">{session.preview}</span>
+                        <span className="chat-history-item-time">{formatTime(session.createdAt)}</span>
+                      </div>
+                      {session.id === activeSessionId ? (
+                        <span className="chat-history-item-current">当前</span>
+                      ) : (
+                      <button
+                        className="chat-history-item-delete"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setPendingDelete(session.id)
+                        }}
+                        aria-label="删除"
+                      >
+                        ✕
+                      </button>
+                      )}
+                    </div>
+                  ))
                 )}
               </div>
             </div>
-          ))}
-          {error && <div className="chat-error">{error}</div>}
+          ) : (
+            <>
+              {!historyLoaded && messages.length === 0 && (
+                <div className="chat-msg assistant">
+                  <img
+                    className="chat-msg-avatar"
+                    src="/rolemap/assets/images/avatar-elysia-02.png"
+                    alt=""
+                  />
+                  <div className="chat-msg-bubble">
+                    <div className="chat-msg-typing">
+                      <span /><span /><span />
+                    </div>
+                  </div>
+                </div>
+              )}
+              {messages.map((m) => (
+                <div key={m.id} className={`chat-msg ${m.role}`}>
+                  {m.role === 'assistant' && (
+                    <img
+                      className="chat-msg-avatar"
+                      src="/rolemap/assets/images/avatar-elysia-02.png"
+                      alt=""
+                    />
+                  )}
+                  <div className="chat-msg-bubble">
+                    {m.content || (
+                      <div className="chat-msg-typing">
+                        <span /><span /><span />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {error && <div className="chat-error">{error}</div>}
+            </>
+          )}
         </div>
 
+        {!showHistory && (
         <div className="chat-input-area">
           <textarea
             ref={inputRef}
@@ -290,6 +547,55 @@ export default function ChatWidget() {
             </svg>
           </button>
         </div>
+        )}
+
+        {pendingDelete && (
+          <ConfirmOverlay onCancel={() => setPendingDelete(null)}>
+            <p className="chat-confirm-text">确定要删除该会话吗？</p>
+            <p className="chat-confirm-warning">删除后不可恢复</p>
+            <div className="chat-confirm-actions">
+              <button
+                className="chat-confirm-cancel"
+                onClick={() => setPendingDelete(null)}
+              >
+                取消
+              </button>
+              <button
+                className="chat-confirm-delete"
+                onClick={() => {
+                  handleDeleteSession(pendingDelete)
+                  setPendingDelete(null)
+                }}
+              >
+                确认删除
+              </button>
+            </div>
+          </ConfirmOverlay>
+        )}
+
+        {pendingNewSession && (
+          <ConfirmOverlay onCancel={() => setPendingNewSession(false)}>
+            <p className="chat-confirm-text">历史会话已达上限（10个）</p>
+            <p className="chat-confirm-warning">新建会话将自动移除最早的会话记录</p>
+            <div className="chat-confirm-actions">
+              <button
+                className="chat-confirm-cancel"
+                onClick={() => setPendingNewSession(false)}
+              >
+                取消
+              </button>
+              <button
+                className="chat-confirm-delete"
+                onClick={() => {
+                  setPendingNewSession(false)
+                  doNewSession()
+                }}
+              >
+                继续新建
+              </button>
+            </div>
+          </ConfirmOverlay>
+        )}
       </div>
     </>
   )
